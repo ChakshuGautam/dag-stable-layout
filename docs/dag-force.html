@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Graph Playground · DAG → Force</title>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<meta name="description" content="The DCF build DAG rendered with priority-node's force component — now collapsible, with selectable force-layout variants and adjustable breathing room.">
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script src="priority-force-graph.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #0f172a; background: #f8fafc; }
+  .nav { display: flex; gap: 4px; align-items: center; padding: 8px 16px; background: #0f172a; }
+  .nav a { color: #94a3b8; text-decoration: none; font-size: 13px; font-weight: 600; padding: 5px 12px; border-radius: 7px; }
+  .nav a:hover { color: #e2e8f0; background: #1e293b; }
+  .nav a.active { color: #fff; background: #2563eb; }
+  .nav .brand { color: #cbd5e1; font-weight: 700; margin-right: 10px; font-size: 13px; }
+  .tool-header { padding: 14px 20px; border-bottom: 1px solid #e2e8f0; background: #fff; }
+  .tool-header h1 { margin: 0 0 2px; font-size: 17px; }
+  .tool-header p { margin: 0; color: #64748b; font-size: 13px; max-width: 1150px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center; padding: 10px 20px; border-bottom: 1px solid #e2e8f0; background: #fff; }
+  .grp { display: flex; flex-direction: column; gap: 5px; }
+  .grp > .h { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; }
+  .seg { display: inline-flex; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; }
+  .seg button { border: none; background: #fff; color: #334155; padding: 6px 12px; font-size: 12.5px; font-weight: 600; cursor: pointer; border-right: 1px solid #e2e8f0; }
+  .seg button:last-child { border-right: none; }
+  .seg button.on { background: #2563eb; color: #fff; }
+  button.act { padding: 7px 13px; border: 1px solid #2563eb; background: #2563eb; color: #fff; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 12.5px; }
+  button.act.sec { background: #fff; color: #1d4ed8; }
+  .legend { display: flex; gap: 14px; align-items: center; font-size: 12px; color: #475569; flex-wrap: wrap; }
+  .legend .item { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 20px; height: 12px; border-radius: 3px; border: 1px solid #cbd5e1; }
+  .ring { width: 13px; height: 13px; border-radius: 50%; border: 1.5px dashed #a78bfa; }
+  .selinfo { font-size: 13px; color: #334155; } .selinfo b { color: #0f172a; }
+  #graph-container { position: relative; width: 100%; height: calc(100vh - 250px); min-height: 340px; background: #0a0a12; overflow: hidden; }
+  #graph-container svg { display: block; cursor: grab; } #graph-container svg:active { cursor: grabbing; }
+  .link { stroke-opacity: 0.7; }
+  .node-group { cursor: pointer; }
+  .node-label { fill: #cbd5e1; font-size: 11px; font-weight: 600; pointer-events: none; paint-order: stroke; stroke: #0a0a12; stroke-width: 3px; }
+  .tooltip .name { font-weight: 700; } .tooltip .score { color: #93c5fd; } .tooltip .meta { color: #94a3b8; font-size: 11px; }
+</style>
+</head>
+<body>
+<div class="nav">
+  <span class="brand">Graph Playground</span>
+  <a href="./">Layout Lab</a>
+  <a href="dag-force.html" class="active">DAG → Force</a>
+</div>
+<div class="tool-header">
+  <h1>DCF Build DAG · collapsible weighted force graph</h1>
+  <p>The DCF build DAG through priority-node's force component, now with <b>node collapse/expand</b> (samples fold into one dashed group node — click to expand, click a child to re-collapse) so it isn't a hairball, plus selectable <b>force-layout variants</b> and adjustable <b>breathing room</b>. Structural mapping: size = transitive <em>descendants</em>, colour = node role (upstream · sample · downstream). Fan-out / fan-in are in the tooltip.</p>
+</div>
+<div class="bar">
+  <div class="grp"><span class="h">Force layout</span>
+    <div class="seg" id="layoutSeg">
+      <button data-v="rankx" class="on">Rank-flow</button><button data-v="center">Center</button><button data-v="radial">Radial</button>
+    </div>
+  </div>
+  <div class="grp"><span class="h">Breathing room</span>
+    <div class="seg" id="spaceSeg">
+      <button data-v="cozy">Cozy</button><button data-v="roomy" class="on">Roomy</button><button data-v="airy">Airy</button>
+    </div>
+  </div>
+  <div class="grp"><span class="h">Samples</span>
+    <div style="display:flex; gap:6px;">
+      <button class="act sec" id="expandAll">Expand all</button>
+      <button class="act sec" id="collapseAll">Collapse all</button>
+      <button class="act" id="reheat">Reheat</button>
+    </div>
+  </div>
+  <div class="grp"><span class="h">&nbsp;</span>
+    <div class="legend">
+      <span class="item"><span class="ring"></span> group (click to expand)</span>
+      <span class="item"><span class="swatch" style="background:#60a5fa"></span> upstream</span>
+      <span class="item"><span class="swatch" style="background:#818cf8"></span> sample step</span>
+      <span class="item"><span class="swatch" style="background:#fbbf24"></span> downstream</span>
+      <span class="item">size = descendants</span>
+    </div>
+  </div>
+  <div class="grp"><span class="h">&nbsp;</span><div class="selinfo" id="selinfo">All samples collapsed · click a dashed group to expand</div></div>
+</div>
+<div id="graph-container"></div>
+<div class="tooltip" id="tooltip" style="position:fixed; display:none; pointer-events:none; background:#111; color:#eee; border:1px solid #333; padding:6px 10px; border-radius:6px; font-size:12px; z-index:10000;"></div>
+
+<script>
+"use strict";
+// DCF build DAG topology (run 658).
+const RUN = [
+  { name: 'load_historical', deps: [] }, { name: 'net_debt', deps: [] },
+  { name: 'cost_structure', deps: ['load_historical'] }, { name: 'historical_expense_notes', deps: ['load_historical'] },
+  { name: 'valuation_method', deps: ['load_historical'] }, { name: 'historical_changes', deps: ['load_historical'] },
+  { name: 'wacc', deps: ['load_historical'] },
+  { name: 'inputs', deps: ['load_historical', 'valuation_method', 'net_debt', 'historical_changes', 'wacc'] },
+];
+[1, 2, 3].forEach((s) => {
+  RUN.push({ name: 'revenue#' + s, deps: ['inputs'] });
+  RUN.push({ name: 'expenses#' + s, deps: ['inputs', 'revenue#' + s, 'cost_structure', 'historical_expense_notes'] });
+  RUN.push({ name: 'capex#' + s, deps: ['inputs'] });
+  RUN.push({ name: 'd_and_a#' + s, deps: ['inputs'] });
+  RUN.push({ name: 'price#' + s, deps: ['inputs'] });
+  RUN.push({ name: 'run_assemble#' + s, deps: ['inputs', 'revenue#' + s, 'expenses#' + s, 'capex#' + s, 'd_and_a#' + s, 'price#' + s] });
+});
+RUN.push({ name: 'projections', deps: ['inputs', 'run_assemble#1', 'run_assemble#2', 'run_assemble#3'] });
+RUN.push({ name: 'final-model', deps: ['inputs', 'projections'] });
+
+const byId = new Map(RUN.map((n) => [n.name, n]));
+const DOWN = new Set(['projections', 'final-model']);
+// Node colour = role (no benefit/cost green-red here — that's priority-node's semantic).
+const KINDFILL = { up: '#60a5fa', group: '#a78bfa', member: '#818cf8', down: '#fbbf24' };
+const SHORT = { load_historical: 'Load hist', net_debt: 'Net debt', cost_structure: 'Cost struct', historical_expense_notes: 'Hist exp notes', valuation_method: 'Val method', historical_changes: 'Hist changes', wacc: 'WACC', inputs: 'Inputs', revenue: 'revenue', expenses: 'expenses', capex: 'capex', d_and_a: 'D&A', price: 'price', run_assemble: 'assemble', projections: 'Projections', 'final-model': 'Final model' };
+const sampleNum = (id) => { const m = /#(\d+)$/.exec(id); return m ? m[1] : null; };
+const prettify = (id) => SHORT[id.replace(/#\d+$/, '')] || id.replace(/[_-]/g, ' ');
+const SAMPLES = [...new Set(RUN.map((n) => sampleNum(n.name)).filter(Boolean))].sort();
+const membersOf = (s) => RUN.filter((n) => sampleNum(n.name) === s).map((n) => n.name);
+const centroid = (ps) => { const l = ps.filter(Boolean); if (!l.length) return null; let x = 0, y = 0; l.forEach((p) => { x += p.x; y += p.y; }); return { x: x / l.length, y: y / l.length }; };
+
+// Effective graph for an expand-set: collapsed samples fold into one group node.
+function effective(expanded) {
+  const cid = (id) => { const s = sampleNum(id); return (s && !expanded.has(s)) ? 'sample#' + s : id; };
+  const present = new Map();
+  RUN.forEach((n) => { const c = cid(n.name); if (!present.has(c)) present.set(c, { id: c, group: c.startsWith('sample#') }); });
+  const eseen = new Set(), edges = [];
+  RUN.forEach((n) => (n.deps || []).forEach((d) => {
+    if (!byId.has(d)) return; const u = cid(d), v = cid(n.name); if (u === v) return;
+    const k = u + '>' + v; if (eseen.has(k)) return; eseen.add(k);
+    const intra = sampleNum(d) && sampleNum(n.name) && sampleNum(d) === sampleNum(n.name);
+    edges.push({ source: u, target: v, intra });
+  }));
+  return { nodes: [...present.values()], edges };
+}
+function ranksOf(eff) {
+  const out = new Map(eff.nodes.map((n) => [n.id, []])), indeg = new Map(eff.nodes.map((n) => [n.id, 0]));
+  eff.edges.forEach((e) => { out.get(e.source).push(e.target); indeg.set(e.target, (indeg.get(e.target) || 0) + 1); });
+  const rank = {}, q = []; const ind = new Map(indeg);
+  eff.nodes.forEach((n) => { if (!ind.get(n.id)) { rank[n.id] = 0; q.push(n.id); } });
+  while (q.length) { const u = q.shift(); out.get(u).forEach((v) => { rank[v] = Math.max(rank[v] || 0, (rank[u] || 0) + 1); ind.set(v, ind.get(v) - 1); if (ind.get(v) === 0) q.push(v); }); }
+  return rank;
+}
+// Map the effective DAG onto priority-node's weighted node model.
+function toWeighted(expanded) {
+  const eff = effective(expanded);
+  const out = new Map(eff.nodes.map((n) => [n.id, []])), inn = new Map(eff.nodes.map((n) => [n.id, []]));
+  eff.edges.forEach((e) => { out.get(e.source).push(e.target); inn.get(e.target).push(e.source); });
+  const desc = (id) => { const seen = new Set(), st = [...out.get(id)]; while (st.length) { const x = st.pop(); if (seen.has(x)) continue; seen.add(x); out.get(x).forEach((y) => st.push(y)); } return seen.size; };
+  const nodes = eff.nodes.map((n) => ({
+    name: n.id, group: n.group,
+    kind: n.group ? 'group' : (DOWN.has(n.id) ? 'down' : (sampleNum(n.id) ? 'member' : 'up')),
+    label: n.group ? ('Sample ' + n.id.slice(7) + ' ×' + membersOf(n.id.slice(7)).length) : prettify(n.id),
+    benefit: out.get(n.id).length, cost: inn.get(n.id).length, score: desc(n.id) + 1,
+  }));
+  const edges = eff.edges.map((e) => ({ source: e.source, target: e.target, normalizedValue: e.intra ? 0.28 : 0.6 }));
+  return { data: { nodes, edges }, rank: ranksOf(eff) };
+}
+
+// ===== state + render =========================================================
+const SPACING = { cozy: { charge: -200, linkDistance: 70, collideGap: 5 }, roomy: { charge: -420, linkDistance: 115, collideGap: 11 }, airy: { charge: -700, linkDistance: 165, collideGap: 18 } };
+const state = { expanded: new Set(), layout: 'rankx', spacing: 'roomy' };
+const container = document.getElementById('graph-container'), tooltip = document.getElementById('tooltip'), selinfo = document.getElementById('selinfo');
+let handle = null;
+const jit = () => (Math.random() * 20 - 10);
+
+function onSelect(d) {
+  if (d.group) { const s = d.name.slice(7); state.expanded.add(s); selinfo.textContent = 'Expanded Sample ' + s; render({ expand: s }); return; }
+  const s = sampleNum(d.name);
+  if (s && state.expanded.has(s)) { state.expanded.delete(s); selinfo.textContent = 'Collapsed Sample ' + s; render({ collapse: s }); return; }
+  selinfo.innerHTML = 'Selected: <b>' + (d.label || d.name) + '</b> · descendants ' + window.pgFmt(d.score - 1) + ' · fan-out ' + window.pgFmt(d.benefit) + ' · fan-in ' + window.pgFmt(d.cost);
+}
+
+function render(action) {
+  const prev = handle ? handle.positions() : {};
+  const seed = { ...prev };
+  if (action && action.expand) { const gp = prev['sample#' + action.expand]; if (gp) membersOf(action.expand).forEach((m) => { seed[m] = { x: gp.x + jit(), y: gp.y + jit() }; }); }
+  if (action && action.collapse) { const c = centroid(membersOf(action.collapse).map((m) => prev[m])); if (c) seed['sample#' + action.collapse] = c; }
+  const { data, rank } = toWeighted(state.expanded);
+  const sp = SPACING[state.spacing];
+  if (handle) handle.destroy();
+  handle = window.PriorityForceGraph(container, tooltip, data, {
+    layout: state.layout, rankOf: (id) => rank[id] || 0, ringGap: state.spacing === 'airy' ? 120 : state.spacing === 'cozy' ? 60 : 90,
+    charge: sp.charge, linkDistance: sp.linkDistance, collideGap: sp.collideGap, seed,
+    nodeStyle: 'solid', fill: (d) => KINDFILL[d.kind] || '#94a3b8',
+    scoreLabel: 'Descendants', benefitLabel: 'Fan-out', costLabel: 'Fan-in', onSelect,
+  });
+}
+
+function wireSeg(id, key, after) {
+  document.getElementById(id).addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-v]'); if (!b) return;
+    document.querySelectorAll('#' + id + ' button').forEach((x) => x.classList.toggle('on', x === b));
+    state[key] = b.dataset.v; if (after) after(); render();
+  });
+}
+wireSeg('layoutSeg', 'layout');
+wireSeg('spaceSeg', 'spacing');
+document.getElementById('expandAll').addEventListener('click', () => { state.expanded = new Set(SAMPLES); selinfo.textContent = 'All samples expanded'; render(); });
+document.getElementById('collapseAll').addEventListener('click', () => { state.expanded = new Set(); selinfo.textContent = 'All samples collapsed'; render(); });
+document.getElementById('reheat').addEventListener('click', () => handle && handle.reheat());
+let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => render(), 200); });
+render();
+</script>
+</body>
+</html>
