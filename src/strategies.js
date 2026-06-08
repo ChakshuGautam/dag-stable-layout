@@ -11,7 +11,7 @@
 //
 // Each strategy returns `{ pos: { id: {cx,cy} }, graph: effectiveGraph }`.
 
-import { effectiveGraph, internalGraph, groupList, groupTag, isGroup } from './groups.js';
+import { effectiveGraph, internalGraph, membersOf, groupList, groupTag, isGroup } from './groups.js';
 import { layeredLayout, DEFAULTS, bbox } from './layout.js';
 
 const mergeOpts = (ctx) => ({ ...DEFAULTS, ...(ctx.layoutOpts || {}) });
@@ -37,16 +37,23 @@ export function baselineLayout(graph, ctx) {
 }
 
 // ---- skeleton: stable slots, reserved once ----------------------------------
+// Reserved slot height = the bounding-box height of the FIRST group's members in the
+// fully-expanded layout, padded by 6px each side (matching the original lab's reservedHeight,
+// which measured `memberBox(fullLayout, firstGroup, pad=6).h`). Using the full layout — rather
+// than a per-group sub-layout — is what makes the collapsed skeleton positions match exactly.
 function reservedHeight(graph, ctx, groups, o) {
+  if (!groups.length) return o.nodeHeight;
   const layout = layoutOf(ctx);
-  let h = o.nodeHeight;
-  for (const g of groups) {
-    const sp = layout(internalGraph(graph, ctx.groupOf, g), o);
-    if (!Object.keys(sp).length) continue;
-    const s = spanOf(sp);
-    h = Math.max(h, s.h + o.nodeHeight + 12); // span is centre-to-centre; pad to box height
+  const groupOf = ctx.groupOf;
+  const full = layout(effectiveGraph(graph, { groupOf, expanded: new Set(groups) }), o);
+  let y0 = Infinity, y1 = -Infinity;
+  for (const m of membersOf(graph, groupOf, groups[0])) {
+    const p = full[m];
+    if (!p) continue;
+    y0 = Math.min(y0, p.cy - o.nodeHeight / 2);
+    y1 = Math.max(y1, p.cy + o.nodeHeight / 2);
   }
-  return h;
+  return isFinite(y0) ? (y1 - y0) + 12 : o.nodeHeight; // +2*pad(6)
 }
 
 export function skeletonLayout(graph, ctx) {
@@ -64,16 +71,18 @@ export function skeletonLayout(graph, ctx) {
     { ...o, heightOf: (n) => (n && n.group != null ? rh : o.nodeHeight) }
   );
 
+  // Downstream nodes shift right of the group column. The reference column is the FIRST
+  // group's slot (fixed, like the original's `sampleX`) — not whichever group is expanded.
+  const refX = groups.length ? (skPos[groupTag(groups[0])]?.cx ?? Infinity) : Infinity;
+
   const sub = {};
-  let shift = 0, refX = Infinity;
+  let shift = 0;
   for (const g of groups) {
     if (!expanded.has(g)) continue;
     const sp = layout(internalGraph(graph, groupOf, g), o);
     const s = spanOf(sp);
     sub[g] = { sp, x0: s.x0, ymid: s.ymid };
     shift = Math.max(shift, s.w);
-    const slot = skPos[groupTag(g)];
-    if (slot) refX = Math.min(refX, slot.cx);
   }
 
   const eff = effectiveGraph(graph, { groupOf, expanded });

@@ -105,11 +105,34 @@ Core (pure JS):
 ### Bring your own layout engine
 
 The strategies only assume a function `graph → { id: {cx, cy} }`. Pass `layout` (and
-`layoutOpts`) in the context to swap the built-in `layeredLayout` for, say, a dagre wrapper:
+`layoutOpts`) in the context to swap the built-in `layeredLayout` for, say, a dagre wrapper.
+A ready-made dagre adapter ships with the package (dagre is a peer dependency):
 
 ```js
-stableLayout(graph, { groupOf, expanded, strategy: 'skeleton', layout: myDagreLayout });
+import dagre from 'dagre';
+import { makeDagreLayout } from 'dag-stable-layout/adapters/dagre';
+
+stableLayout(graph, { groupOf, expanded, strategy: 'skeleton', layout: makeDagreLayout(dagre) });
 ```
+
+## Pixel-perfect parity with the original
+
+The strategy math is a faithful port of the original Graph Playground. With the dagre adapter
+injected (the engine the playground uses), this library reproduces the original algorithm's
+node coordinates **exactly** — verified to `0px` across every graph (real / flat / chain / toy),
+every strategy (`baseline` / `inflate` / `skeleton`), and every expand/collapse subset:
+
+```
+$ npm run parity
+checked 78 (graph × strategy × expand-set) combinations; node-set mismatches: 0
+global worst delta = 0
+✅ PIXEL-PERFECT — every node matches the original within 0.000001px, across all graphs
+```
+
+The harness ([`parity/`](parity/)) runs the original algorithm (DOM stripped, dagre injected,
+math verbatim) as an oracle and diffs every node centre against the library's output. It runs
+as part of `npm test` (`test/parity.test.js`), so the guarantee can't silently regress.
+Identical coordinates + identical DOM/CSS ⇒ identical pixels.
 
 ### Browser force-graph (optional)
 

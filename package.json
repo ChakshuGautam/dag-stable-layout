@@ -6,12 +6,19 @@
   "main": "src/index.js",
   "exports": {
     ".": "./src/index.js",
-    "./web/priority-force-graph": "./src/web/priorityForceGraph.js"
+    "./web/priority-force-graph": "./src/web/priorityForceGraph.js",
+    "./adapters/dagre": "./src/adapters/dagre.js"
   },
-  "files": ["src", "examples", "README.md", "LICENSE"],
+  "files": [
+    "src",
+    "examples",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "test": "node --test",
-    "example": "node examples/compare.js"
+    "example": "node examples/compare.js",
+    "parity": "node parity/run.mjs"
   },
   "keywords": [
     "dag",
@@ -32,5 +39,8 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "devDependencies": {
+    "dagre": "0.8.5"
   }
 }
