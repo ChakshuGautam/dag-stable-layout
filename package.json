@@ -18,7 +18,8 @@
   "scripts": {
     "test": "node --test",
     "example": "node examples/compare.js",
-    "parity": "node parity/run.mjs"
+    "parity": "node parity/run.mjs",
+    "build:docs": "rm -rf docs/lib && cp -R src docs/lib"
   },
   "keywords": [
     "dag",
