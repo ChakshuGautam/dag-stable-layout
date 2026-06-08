@@ -1,0 +1,36 @@
+{
+  "name": "dag-stable-layout",
+  "version": "0.1.0",
+  "description": "Small, dependency-free toolkit for laying out collapsible DAGs with measurable layout stability (sibling drift). Distilled from the Graph Playground layout-stability lab.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./web/priority-force-graph": "./src/web/priorityForceGraph.js"
+  },
+  "files": ["src", "examples", "README.md", "LICENSE"],
+  "scripts": {
+    "test": "node --test",
+    "example": "node examples/compare.js"
+  },
+  "keywords": [
+    "dag",
+    "graph",
+    "layout",
+    "layered",
+    "sugiyama",
+    "topological-sort",
+    "force-directed",
+    "expand-collapse",
+    "visualization"
+  ],
+  "author": "Chakshu Gautam",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ChakshuGautam/dag-stable-layout.git"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
