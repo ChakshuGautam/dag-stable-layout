@@ -9,6 +9,9 @@ Distilled from the **Graph Playground · Layout-Stability Lab**
 ([graph-playground.aisloppy.com](https://graph-playground.aisloppy.com)) into a reusable,
 framework-agnostic core with a test suite.
 
+**🔗 Live demo:** https://chakshugautam.github.io/dag-stable-layout/ — the interactive
+playground (Layout Lab + DAG→Force), served from [`docs/`](docs/).
+
 ## Why
 
 In an expand/collapse graph view, the natural thing — re-running the layout on every toggle —
