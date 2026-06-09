@@ -10,7 +10,7 @@ Distilled from the **Graph Playground · Layout-Stability Lab**
 framework-agnostic core with a test suite.
 
 **🔗 Live demo:** https://chakshugautam.github.io/dag-stable-layout/ — the interactive
-playground, served from [`docs/`](docs/). The **Layout Lab** page is driven by this library:
+playground, served from [`docs/`](docs/). ▶ [Watch a short screen recording](https://chakshugautam.github.io/dag-stable-layout/demo.mp4). The **Layout Lab** page is driven by this library:
 `docs/app.js` imports `stableLayout` + the dagre adapter and uses them for all layout; the
 parity test guarantees it renders pixel-identically to the original. Re-vendor the library into
 the page with `npm run build:docs` (copies `src/` → `docs/lib/`).
